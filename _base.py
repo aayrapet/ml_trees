@@ -3,6 +3,7 @@ import numpy as np
 from typing import Literal
 import _err_handl as erh
 
+
 class BinaryTreeNode:
     def __init__(
         self,
@@ -88,9 +89,9 @@ class DecisionTreeClassifier:
         https://towardsdatascience.com/decision-trees-explained-entropy-information-gain-gini-index-ccp-pruning-4d78070db36c
 
         """
-        erh.check_arguments_data((nb_paths,int),(method,str),(print_mode,bool))
+        erh.check_arguments_data((nb_paths, int), (method, str), (print_mode, bool))
         if method not in ["entropy", "gini"]:
-            raise ValueError('method has to be entropy or gini')
+            raise ValueError("method has to be entropy or gini")
         self.nb_paths = nb_paths
         self.print_mode = print_mode
         self.method = method
@@ -118,7 +119,9 @@ class DecisionTreeClassifier:
         elif self.method == "gini":
             return (1 - (proba @ proba)), sums
 
-    def verif(self, unique_values: np.ndarray, value_counts: np.ndarray):
+    def verif(
+        self, unique_values: np.ndarray, value_counts: np.ndarray, on_val_counts: bool
+    ):
         """
         When some classes are not found with a split, i want their value counts to be present in the probability vector and set up to 0.
 
@@ -126,8 +129,12 @@ class DecisionTreeClassifier:
         """
         if not np.array_equal(np.setdiff1d(self.classes, unique_values), np.array([])):
             not_included = np.setdiff1d(self.classes, unique_values)
-            # unique_values_r=(np.concatenate((not_included,unique_values_r)))
-            value_counts = np.concatenate((np.zeros(len(not_included)), value_counts))
+            if not on_val_counts:
+                unique_values = np.concatenate((not_included, unique_values))
+            else:
+                value_counts = np.concatenate(
+                    (np.zeros(len(not_included)), value_counts)
+                )
         return unique_values, value_counts
 
     @staticmethod
@@ -164,9 +171,11 @@ class DecisionTreeClassifier:
 
 
         """
-        erh.check_arguments_data((x,np.ndarray),(y,np.ndarray))
-        self.classes = np.unique(y)
+        erh.check_arguments_data((x, np.ndarray), (y, np.ndarray))
+
+        self.classes = sorted(np.unique(y))
         table = np.column_stack((x, y))
+
         self.nb_obs = x.shape[0]
         self.target_index = table.shape[1] - 1
         self.variable_index = np.arange(table.shape[1] - 1)
@@ -211,10 +220,10 @@ class DecisionTreeClassifier:
                 )
                 # verify value counts
                 unique_values_r, value_counts_r = self.verif(
-                    unique_values_r, value_counts_r
+                    unique_values_r, value_counts_r, True
                 )
                 unique_values_l, value_counts_l = self.verif(
-                    unique_values_l, value_counts_l
+                    unique_values_l, value_counts_l, True
                 )
                 # calculate entropy/gini
                 E_right, sums_r = self.formula(value_counts_r)
@@ -442,4 +451,34 @@ class DecisionTreeClassifier:
                 i = i + 1
 
             equations = equations * 2
+
         return nodes
+
+    def predict(self, x: np.ndarray):
+        """
+        Predict Y using decision Tree pure/leaf nodes' conditions
+
+        """
+        predictions = None
+        indexed_table = np.column_stack((np.arange(x.shape[0]), x))
+        for el in self.nodes.keys():
+            node = self.nodes[el]
+            if node.final_node:
+
+                uni_verif, vc_verif = self.verif(node.unique_v, node.v_counts, False)
+
+                index = np.argmax(vc_verif)
+                predicted_label = uni_verif[index]
+                got = indexed_table[node.condition]
+                block_predictions = np.column_stack(
+                    (got[:, 0], np.ones(got.shape[0]) * predicted_label)
+                )
+                if predictions is None:
+                    predictions = block_predictions.copy()
+                else:
+                    predictions = np.row_stack((predictions, block_predictions))
+
+        indices = np.argsort(predictions[:, 0])
+        predictions = (predictions[indices])[:, 1]
+
+        return predictions
