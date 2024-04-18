@@ -301,14 +301,20 @@ class DecisionTreeClassifier:
             None,  # filtered indices
         )
         ft = True
+        max_len_branch=(2**(self.nb_paths-1))*2
+        viz_matrix=np.zeros((max_len_branch,self.nb_paths+1))
+        h=0
+        viz_matrix[0,h]=0
         for k in range(self.nb_paths):
-
+            max_len_branch=2**(self.nb_paths-1-h)
+            initial_position_row=0
+            h=h+1
             for j in range(equations):
                 # definition of nodes
                 current_node_name = f"node_{i}"
                 right_node_name = f"node_{i+equations+j}"
                 left_node_name = f"node_{i+equations+j+1}"
-
+                
                 # if parent node has child node
                 if nodes[current_node_name].next_node:
                     if ft:
@@ -339,8 +345,7 @@ class DecisionTreeClassifier:
                         filtered_indicesL = np.where(conditionLF)[0]
                         ft = False
                     else:
-                        #   print(filtered_indicesL)
-                        #   print(np.where(conditionLF)[0])
+                    
                         filtered_indicesR = nodes[current_node_name].filtered_indices[
                             np.where(conditionRF)[0]
                         ]
@@ -406,7 +411,7 @@ class DecisionTreeClassifier:
                     ]  # Right tree
 
                     nodes[current_node_name].left = nodes[left_node_name]  # left tree
-
+                    
                 # if parent node has not child node (pure node or nodes that are dependend on this pure node and which are not defined)
                 else:
                     # define empty child nodes and DO NOT connect them to parent pure node
@@ -437,7 +442,15 @@ class DecisionTreeClassifier:
                     if isinstance((nodes[current_node_name].condition), np.ndarray):
                         if self.print_mode:
                             print("pure node is ", nodes[current_node_name].index)
-
+                
+                # if isinstance((nodes[right_node_name].condition), np.ndarray):
+                viz_matrix[initial_position_row,h]=i+equations+j
+                # else:
+                #     viz_matrix[initial_position_row,h]=0
+                # if isinstance((nodes[left_node_name].condition), np.ndarray):
+                viz_matrix[initial_position_row+max_len_branch,h]=i+equations+j+1
+                # else:
+                #     viz_matrix[initial_position_row,h]=0
                 if (
                     k == (self.nb_paths - 1)
                     and nodes[current_node_name].next_node == True
@@ -445,13 +458,16 @@ class DecisionTreeClassifier:
                     nodes[current_node_name].right.final_node = True
                     nodes[current_node_name].left.final_node = True
                     if self.print_mode:
+                        
                         print("leaf node is : ", nodes[current_node_name].right.index)
                         print("leaf node is : ", nodes[current_node_name].left.index)
 
                 i = i + 1
+                initial_position_row=initial_position_row+(max_len_branch)*2
 
             equations = equations * 2
-
+           
+        self.viz=viz_matrix
         return nodes
 
     def predict(self, x: np.ndarray):
@@ -482,3 +498,72 @@ class DecisionTreeClassifier:
         predictions = (predictions[indices])[:, 1]
 
         return predictions
+    
+    def initialise(self,nb, indexes):
+  
+      for i in range(self.nb_paths - 1, -1, -1):
+          nb = nb - 1
+          if nb >= 0:
+              indexes[i] = None
+
+    
+    def visualise(self,matrix):
+        indexes = {}
+        indexes_digits = {}
+        loc_indexes_digit = {}
+        self.initialise(self.nb_paths - 1, loc_indexes_digit)
+        self.initialise(self.nb_paths - 1, indexes_digits)
+        old_nz = -float("inf")
+        ft = True
+        first_line = True
+        for line2 in matrix:
+            nb_nz = len(np.nonzero(line2)[0])
+    
+            if nb_nz - old_nz > 1:
+                self.initialise(nb_nz, indexes)
+            st = ""
+            for i in range(len(line2) - 1):
+    
+                if ft:
+                    ft = False
+                    st = st + "0"
+                    st = st + "----" + str(int(line2[i + 1]))
+                else:
+                    if (i == indexes[i]) and line2[i] == 0:
+                        st = st + "     " + ((indexes_digits[i] - 1) * " ")
+                        if line2[i + 1] != 0:
+                            st = st + "----" + str(int(line2[i + 1]))
+    
+                    else:
+                        if line2[i] == 0 and line2[i + 1] == 0:
+                            st = st + ((indexes_digits[i] - 1) * " ") + "|    "
+                        elif line2[i] == 0 and line2[i + 1] != 0:
+    
+                            st = st + ((indexes_digits[i] - 1) * " ") + "\----"
+    
+                            index_line = i
+                            indexes[index_line] = index_line
+                            st = st + str(int(line2[i + 1]))
+                        elif line2[i] != 0 and line2[i + 1] != 0:
+                            st = st + "----" + str(int(line2[i + 1]))
+    
+                    if i == indexes[i]:
+                        if line2[i] != 0:
+                            indexes[i] = None
+                if first_line:
+                    indexes_digits[i] = len(str(int(line2[i])))
+    
+                else:
+    
+                    if line2[i] != 0:
+                        loc_indexes_digit[i] = len(str(int(line2[i])))
+                    else:
+                        loc_indexes_digit[i] = indexes_digits[i]
+    
+            if loc_indexes_digit != indexes_digits and not first_line:
+                indexes_digits = loc_indexes_digit
+    
+            if first_line:
+                first_line = False
+            print(st)
+            old_nz = nb_nz
