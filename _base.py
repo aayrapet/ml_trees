@@ -305,6 +305,7 @@ class DecisionTreeClassifier:
         viz_matrix=np.zeros((max_len_branch,self.nb_paths+1))
         h=0
         viz_matrix[0,h]=0
+        list_max_branches=[]
         for k in range(self.nb_paths):
             max_len_branch=2**(self.nb_paths-1-h)
             initial_position_row=0
@@ -443,14 +444,14 @@ class DecisionTreeClassifier:
                         if self.print_mode:
                             print("pure node is ", nodes[current_node_name].index)
                 
-                # if isinstance((nodes[right_node_name].condition), np.ndarray):
-                viz_matrix[initial_position_row,h]=i+equations+j
-                # else:
-                #     viz_matrix[initial_position_row,h]=0
-                # if isinstance((nodes[left_node_name].condition), np.ndarray):
-                viz_matrix[initial_position_row+max_len_branch,h]=i+equations+j+1
-                # else:
-                #     viz_matrix[initial_position_row,h]=0
+                if isinstance((nodes[right_node_name].condition), np.ndarray):
+                 viz_matrix[initial_position_row,h]=i+equations+j
+                else:
+                        viz_matrix[initial_position_row,h]=0
+                if isinstance((nodes[left_node_name].condition), np.ndarray):
+                 viz_matrix[initial_position_row+max_len_branch,h]=i+equations+j+1
+                else:
+                        viz_matrix[initial_position_row,h]=0
                 if (
                     k == (self.nb_paths - 1)
                     and nodes[current_node_name].next_node == True
@@ -466,8 +467,9 @@ class DecisionTreeClassifier:
                 initial_position_row=initial_position_row+(max_len_branch)*2
 
             equations = equations * 2
-           
+            list_max_branches.append(max_len_branch)
         self.viz=viz_matrix
+        self.list=np.array(list_max_branches)
         return nodes
 
     def predict(self, x: np.ndarray):
@@ -508,62 +510,97 @@ class DecisionTreeClassifier:
 
     
     def visualise(self,matrix):
+        """   
+        Tree visualisation of nodes. 
+        
+        Parameters
+        ----
+        
+        Matrix (array) : Matrix of generated indexes of nodes accessible via : model.viz
+        
+        """
         indexes = {}
         indexes_digits = {}
         loc_indexes_digit = {}
         self.initialise(self.nb_paths - 1, loc_indexes_digit)
         self.initialise(self.nb_paths - 1, indexes_digits)
-        old_nz = -float("inf")
+        self.initialise(self.nb_paths, indexes)
+        empty_init_loc=float('inf')
+
+        empty_init=empty_init_loc
+        current_nb=None
+        nb_authorized=None
+        
         ft = True
         first_line = True
         for line2 in matrix:
-            nb_nz = len(np.nonzero(line2)[0])
-    
-            if nb_nz - old_nz > 1:
-                self.initialise(nb_nz, indexes)
+            empty_init_loc=float('inf')
             st = ""
+            was=False
             for i in range(len(line2) - 1):
     
-                if ft:
-                    ft = False
-                    st = st + "0"
-                    st = st + "----" + str(int(line2[i + 1]))
-                else:
-                    if (i == indexes[i]) and line2[i] == 0:
-                        st = st + "     " + ((indexes_digits[i] - 1) * " ")
-                        if line2[i + 1] != 0:
-                            st = st + "----" + str(int(line2[i + 1]))
-    
-                    else:
-                        if line2[i] == 0 and line2[i + 1] == 0:
-                            st = st + ((indexes_digits[i] - 1) * " ") + "|    "
-                        elif line2[i] == 0 and line2[i + 1] != 0:
-    
-                            st = st + ((indexes_digits[i] - 1) * " ") + "\----"
-    
-                            index_line = i
-                            indexes[index_line] = index_line
-                            st = st + str(int(line2[i + 1]))
-                        elif line2[i] != 0 and line2[i + 1] != 0:
-                            st = st + "----" + str(int(line2[i + 1]))
-    
-                    if i == indexes[i]:
-                        if line2[i] != 0:
-                            indexes[i] = None
-                if first_line:
-                    indexes_digits[i] = len(str(int(line2[i])))
-    
-                else:
-    
-                    if line2[i] != 0:
-                        loc_indexes_digit[i] = len(str(int(line2[i])))
-                    else:
-                        loc_indexes_digit[i] = indexes_digits[i]
-    
+                     
+                 if ft:
+                     ft = False
+                     st = st + "0"
+                     st = st + "----" + str(int(line2[i + 1]))
+                 else:
+                     if i>=empty_init and current_nb<=nb_authorized:
+                         st=st+"     "
+                     else:   
+                     
+                        if (i == indexes[i]) and line2[i] == 0:
+                            st = st + "     " + ((indexes_digits[i] - 1) * " ")
+                            if line2[i + 1] != 0:
+                                st = st + "----" + str(int(line2[i + 1]))
+        
+                        else:
+                            if line2[i] == 0 and line2[i + 1] == 0 and not was:
+                                st = st + ((indexes_digits[i] - 1) * " ") + "|    "
+                            elif line2[i] == 0 and line2[i + 1] != 0:
+        
+                                st = st + ((indexes_digits[i] - 1) * " ") + "\----"
+        
+                                index_line = i
+                                indexes[index_line] = index_line
+                                st = st + str(int(line2[i + 1]))
+                            elif line2[i] != 0 and line2[i + 1] != 0:
+                                st = st + "----" + str(int(line2[i + 1]))
+                            elif line2[i]!=0 and line2[i+1]==0:
+                                empty_init_loc=i
+                                st=st+"     "
+                                was=True
+                            elif line2[i]==0 and line2[i+1]==0 and was:
+                                st=st+"     "
+     
+                     if i == indexes[i]:
+                         if line2[i] != 0:
+                             indexes[i] = None
+                 if first_line:
+                     indexes_digits[i] = len(str(int(line2[i])))
+     
+                 else:
+     
+                     if line2[i] != 0:
+                         loc_indexes_digit[i] = len(str(int(line2[i])))
+                     else:
+                         loc_indexes_digit[i] = indexes_digits[i]
+     
             if loc_indexes_digit != indexes_digits and not first_line:
                 indexes_digits = loc_indexes_digit
     
             if first_line:
                 first_line = False
-            print(st)
-            old_nz = nb_nz
+            if len(np.nonzero(line2)[0])!=0:
+                print(st)
+            if empty_init_loc<float('inf'):
+               nb_authorized=(self.list[empty_init_loc-1])-1
+               nb_authorized
+               current_nb=1
+               empty_init=empty_init_loc
+            else:
+
+                if current_nb==nb_authorized:
+                    empty_init=float('inf')
+                current_nb=current_nb+1
+         
